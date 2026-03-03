@@ -1,0 +1,46 @@
+"""
+Pydantic schemas for authentication
+"""
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
+from datetime import datetime
+
+
+class UserRegister(BaseModel):
+    """User registration request"""
+
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=100)
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class UserLogin(BaseModel):
+    """User login request"""
+
+    email: EmailStr
+    password: str
+
+
+class Token(BaseModel):
+    """JWT token response"""
+
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserResponse(BaseModel):
+    """User profile response"""
+
+    id: str
+    email: str
+    full_name: Optional[str]
+    phone: Optional[str]
+    is_active: bool
+    is_verified: bool
+    subscription_tier: str
+    subscription_expires_at: Optional[datetime]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
