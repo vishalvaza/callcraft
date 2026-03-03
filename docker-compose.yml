@@ -1,0 +1,77 @@
+# CallCraft - Docker Compose Configuration
+# Local development environment with PostgreSQL, Ollama, and Backend API
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: callcraft-postgres
+    environment:
+      POSTGRES_USER: callcraft
+      POSTGRES_PASSWORD: callcraft
+      POSTGRES_DB: callcraft
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U callcraft"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - callcraft-network
+
+  # Ollama LLM Server
+  ollama:
+    image: ollama/ollama:latest
+    container_name: callcraft-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - callcraft-network
+    # Note: After starting, pull the model with:
+    # docker exec -it callcraft-ollama ollama pull qwen2.5:7b-instruct
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: callcraft-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - DATABASE_URL=postgresql://callcraft:callcraft@postgres:5432/callcraft
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:7b-instruct
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - BACKEND_CORS_ORIGINS=["*"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - callcraft-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+networks:
+  callcraft-network:
+    driver: bridge
